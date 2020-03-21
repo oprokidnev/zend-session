@@ -21,6 +21,7 @@ class SessionManager extends AbstractManager
      * Default options when a call to {@link destroy()} is made
      * - send_expire_cookie: whether or not to send a cookie expiring the current session cookie
      * - clear_storage: whether or not to empty the storage object of any stored values
+     *
      * @var array
      */
     protected $defaultDestroyOptions = [
@@ -55,11 +56,11 @@ class SessionManager extends AbstractManager
     /**
      * Constructor
      *
-     * @param  Config\ConfigInterface|null           $config
-     * @param  Storage\StorageInterface|null         $storage
+     * @param  Config\ConfigInterface|null $config
+     * @param  Storage\StorageInterface|null $storage
      * @param  SaveHandler\SaveHandlerInterface|null $saveHandler
-     * @param  array                                 $validators
-     * @param  array                                 $options
+     * @param  array $validators
+     * @param  array $options
      * @throws Exception\RuntimeException
      */
     public function __construct(
@@ -76,6 +77,48 @@ class SessionManager extends AbstractManager
 
         parent::__construct($config, $storage, $saveHandler, $validators);
         register_shutdown_function([$this, 'writeClose']);
+
+        // URI scheme
+        if ((!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off')
+            || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])
+                && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')
+        ) {
+            $scheme = 'https';
+        } else {
+            $scheme = 'http';
+        }
+
+        if ($scheme === 'https') {
+            ini_set('session.cookie_samesite', 'None');
+            ini_set('session.cookie_secure', '1');
+        }
+    }
+
+    /**
+     * Get the HTTP host
+     *
+     * @return string
+     */
+    // @codingStandardsIgnoreStart
+    protected function _getHttpHost()
+    {
+        // @codingStandardsIgnoreEnd
+        if (!empty($_SERVER['HTTP_HOST'])) {
+            return $_SERVER['HTTP_HOST'];
+        }
+
+        $https = isset($_SERVER['HTTPS']) ? $_SERVER['HTTPS'] : null;
+        $scheme = $https === 'on' ? 'https' : 'http';
+        $name = isset($_SERVER['SERVER_NAME']) ? $_SERVER['SERVER_NAME'] : '';
+        $port = isset($_SERVER['SERVER_PORT']) ? (int)$_SERVER['SERVER_PORT'] : 80;
+
+        if (($scheme === 'http' && $port === 80)
+            || ($scheme === 'https' && $port === 443)
+        ) {
+            return $name;
+        }
+
+        return sprintf('%s:%d', $name, $port);
     }
 
     /**
@@ -95,6 +138,7 @@ class SessionManager extends AbstractManager
         if (headers_sent()) {
             return true;
         }
+
         return false;
     }
 
@@ -105,7 +149,7 @@ class SessionManager extends AbstractManager
      * {@link isValid()} once session_start() is called, and raises an
      * exception if validation fails.
      *
-     * @param bool $preserveStorage        If set to true, current session storage will not be overwritten by the
+     * @param bool $preserveStorage If set to true, current session storage will not be overwritten by the
      *                                     contents of $_SESSION.
      * @return void
      * @throws Exception\RuntimeException
@@ -137,7 +181,7 @@ class SessionManager extends AbstractManager
 
         session_start();
 
-        if (! empty($oldSessionData) && is_array($oldSessionData)) {
+        if (!empty($oldSessionData) && is_array($oldSessionData)) {
             $_SESSION = ArrayUtils::merge($oldSessionData, $_SESSION, true);
         }
 
@@ -146,7 +190,7 @@ class SessionManager extends AbstractManager
         // Since session is starting, we need to potentially repopulate our
         // session storage
         if ($storage instanceof Storage\SessionStorage && $_SESSION !== $storage) {
-            if (! $preserveStorage) {
+            if (!$preserveStorage) {
                 $storage->fromArray($_SESSION);
             }
             $_SESSION = $storage;
@@ -156,7 +200,7 @@ class SessionManager extends AbstractManager
 
         $this->initializeValidatorChain();
 
-        if (! $this->isValid()) {
+        if (!$this->isValid()) {
             throw new Exception\RuntimeException('Session validation failed');
         }
     }
@@ -166,7 +210,7 @@ class SessionManager extends AbstractManager
      */
     protected function initializeValidatorChain()
     {
-        $validatorChain  = $this->getValidatorChain();
+        $validatorChain = $this->getValidatorChain();
         $validatorValues = $this->getStorage()->getMetadata('_VALID');
 
         foreach ($this->validators as $validator) {
@@ -188,7 +232,7 @@ class SessionManager extends AbstractManager
      */
     public function destroy(array $options = null)
     {
-        if (! $this->sessionExists()) {
+        if (!$this->sessionExists()) {
             return;
         }
 
@@ -228,8 +272,8 @@ class SessionManager extends AbstractManager
         // session_write_close() operation, no changes made to it will be
         // flushed to the session handler. As such, we now mark the storage
         // object isImmutable.
-        $storage  = $this->getStorage();
-        if (! $storage->isImmutable()) {
+        $storage = $this->getStorage();
+        if (!$storage->isImmutable()) {
             $_SESSION = $storage->toArray(true);
             session_write_close();
             $storage->fromArray($_SESSION);
@@ -255,7 +299,7 @@ class SessionManager extends AbstractManager
             );
         }
 
-        if (! preg_match('/^[a-zA-Z0-9]+$/', $name)) {
+        if (!preg_match('/^[a-zA-Z0-9]+$/', $name)) {
             throw new Exception\InvalidArgumentException(
                 'Name provided contains invalid characters; must be alphanumeric only'
             );
@@ -263,6 +307,7 @@ class SessionManager extends AbstractManager
 
         $this->name = $name;
         session_name($name);
+
         return $this;
     }
 
@@ -282,6 +327,7 @@ class SessionManager extends AbstractManager
             // in order to do things such as setting cookies.
             $this->name = session_name();
         }
+
         return $this->name;
     }
 
@@ -301,6 +347,7 @@ class SessionManager extends AbstractManager
             );
         }
         session_id($id);
+
         return $this;
     }
 
@@ -328,7 +375,7 @@ class SessionManager extends AbstractManager
     public function regenerateId($deleteOldSession = true)
     {
         if ($this->sessionExists()) {
-            session_regenerate_id((bool) $deleteOldSession);
+            session_regenerate_id((bool)$deleteOldSession);
         }
 
         return $this;
@@ -348,6 +395,7 @@ class SessionManager extends AbstractManager
             $ttl = $this->getConfig()->getRememberMeSeconds();
         }
         $this->setSessionCookieLifetime($ttl);
+
         return $this;
     }
 
@@ -361,6 +409,7 @@ class SessionManager extends AbstractManager
     public function forgetMe()
     {
         $this->setSessionCookieLifetime(0);
+
         return $this;
     }
 
@@ -375,6 +424,7 @@ class SessionManager extends AbstractManager
     public function setValidatorChain(EventManagerInterface $chain)
     {
         $this->validatorChain = $chain;
+
         return $this;
     }
 
@@ -390,6 +440,7 @@ class SessionManager extends AbstractManager
         if (null === $this->validatorChain) {
             $this->setValidatorChain(new ValidatorChain($this->getStorage()));
         }
+
         return $this->validatorChain;
     }
 
@@ -435,7 +486,7 @@ class SessionManager extends AbstractManager
     public function expireSessionCookie()
     {
         $config = $this->getConfig();
-        if (! $config->getUseCookies()) {
+        if (!$config->getUseCookies()) {
             return;
         }
         setcookie(
@@ -461,7 +512,7 @@ class SessionManager extends AbstractManager
     protected function setSessionCookieLifetime($ttl)
     {
         $config = $this->getConfig();
-        if (! $config->getUseCookies()) {
+        if (!$config->getUseCookies()) {
             return;
         }
 

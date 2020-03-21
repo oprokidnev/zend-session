@@ -1,5 +1,5 @@
 {
-    "name": "zendframework/zend-session",
+    "name": "oprokidnev/zend-session",
     "description": "Object-oriented interface to PHP sessions and storage",
     "license": "BSD-3-Clause",
     "keywords": [
@@ -19,6 +19,9 @@
         "php": "^5.6 || ^7.0",
         "zendframework/zend-eventmanager": "^2.6.2 || ^3.0",
         "zendframework/zend-stdlib": "^3.2.1"
+    },
+    "replace":{
+        "zendframework/zend-session":"2.9.x-dev"
     },
     "require-dev": {
         "container-interop/container-interop": "^1.1",

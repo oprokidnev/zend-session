@@ -21,7 +21,7 @@
         "zendframework/zend-stdlib": "^3.2.1"
     },
     "replace":{
-        "zendframework/zend-session":"2.9.x-dev"
+        "zendframework/zend-session":"*"
     },
     "require-dev": {
         "container-interop/container-interop": "^1.1",
